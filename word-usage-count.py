@@ -13,6 +13,8 @@ parser.add_argument("-s", "--short-first", action='store_true', help="Shortest w
 parser.add_argument("-a", "--alphabet", action='store_true', help="Print words in alphabetical order")
 parser.add_argument("filename", help="Full path to the essay text file")
 
+common_ignore = {'the', 'to', 'of', 'and', 'in', 'that', 'are', 'this', 'they'}
+
 
 def alphabet_comparator(x, y):
     if x > y:
@@ -40,14 +42,32 @@ def printPretty(dictionary):
         print("{:<8} {:<15}".format(v, k))
 
 
+def is_meta_start(line):
+    return '<--' in line
+
+
+def is_meta_end(line):
+    return '-->' in line
+
+
 dic = {}
 arguments = parser.parse_args()
 print(arguments)
 print(arguments.short_first)
 print(arguments.alphabet)
 essay = pathlib.Path(arguments.filename)
+is_meta = False
+meta = ''
 with open(essay) as file:
     for l in file:
+        if is_meta_start(l):
+            is_meta = True
+            continue
+        if is_meta_end(l):
+            is_meta = False
+        if is_meta:
+            meta += l
+            continue
         words = list(filter(None, re.split('\W', l)))
         for w in words:
             lc = w.lower()
@@ -55,7 +75,7 @@ with open(essay) as file:
                 dic[lc] = dic[lc] + 1
             else:
                 dic[lc] = 1
-
+print(meta)
 if (arguments.short_first):
     printPretty(dict(sorted(dic.items(), key=cmp_to_key(len_comparator))))
 if (arguments.most_used_first):
