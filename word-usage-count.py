@@ -1,7 +1,9 @@
 import argparse
-import re
 import pathlib
+import re
+import os
 from functools import cmp_to_key
+from docx import Document
 
 filename = "filename"
 parser = argparse.ArgumentParser(
@@ -50,35 +52,76 @@ def is_meta_end(line):
     return '-->' in line
 
 
-dic = {}
+class Essay:
+    meta = ''
+    dic = {}
+
+    def get_meta(self):
+        return self.meta
+
+    def get_dic(self):
+        return self.dic
+
+    def __init__(self, filePath):
+        self.filePath = filePath
+
+    def parseFile(self):
+        if (self.filePath.suffix == '.txt'):
+            self.parseTextFile()
+        else:
+            self.parseDocxFile()
+
+    def extractMeta(self):
+        pass
+
+    def parseTextFile(self):
+        is_meta = False
+        with open(self.filePath) as file:
+            for l in file:
+                if is_meta_start(l):
+                    is_meta = True
+                    continue
+                if is_meta_end(l):
+                    is_meta = False
+                if is_meta:
+                    self.meta += l
+                    continue
+                words = list(filter(None, re.split('\W', l)))
+                for w in words:
+                    lc = w.lower()
+                    if lc in self.dic:
+                        self.dic[lc] = self.dic[lc] + 1
+                    else:
+                        self.dic[lc] = 1
+
+    def parseDocxFile(self):
+        is_meta = False
+        doc = Document(self.filePath)
+        for l in doc.paragraphs:
+            if is_meta_start(l.text):
+                is_meta = True
+                continue
+            if is_meta_end(l.text):
+                is_meta = False
+            if is_meta:
+                self.meta += l.text
+                continue
+            words = list(filter(None, re.split('\W', l.text)))
+            for w in words:
+                lc = w.lower()
+                if lc in self.dic:
+                    self.dic[lc] = self.dic[lc] + 1
+                else:
+                    self.dic[lc] = 1
+
+
 arguments = parser.parse_args()
-print(arguments)
-print(arguments.short_first)
-print(arguments.alphabet)
-essay = pathlib.Path(arguments.filename)
-is_meta = False
-meta = ''
-with open(essay) as file:
-    for l in file:
-        if is_meta_start(l):
-            is_meta = True
-            continue
-        if is_meta_end(l):
-            is_meta = False
-        if is_meta:
-            meta += l
-            continue
-        words = list(filter(None, re.split('\W', l)))
-        for w in words:
-            lc = w.lower()
-            if lc in dic:
-                dic[lc] = dic[lc] + 1
-            else:
-                dic[lc] = 1
-print(meta)
+essayPath = pathlib.Path(arguments.filename)
+essayAnalysis = Essay(essayPath)
+essayAnalysis.parseFile()
 if (arguments.short_first):
-    printPretty(dict(sorted(dic.items(), key=cmp_to_key(len_comparator))))
+    printPretty(dict(sorted(essayAnalysis.get_dic().items(), key=cmp_to_key(len_comparator))))
 if (arguments.most_used_first):
-    printPretty(dict(sorted(dic.items(), key=lambda x: x[1], reverse=True)))
+    printPretty(dict(sorted(essayAnalysis.get_dic().items(), key=lambda x: x[1], reverse=True)))
 if (arguments.alphabet):
-    printPretty(dict(sorted(dic.items(), key=lambda x: x[0])))
+    printPretty(dict(sorted(essayAnalysis.get_dic().items(), key=lambda x: x[0])))
