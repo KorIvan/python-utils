@@ -1,11 +1,15 @@
 import argparse
 import pathlib
-import re
 import os
+import re
+import textwrap
 from functools import cmp_to_key
 from docx import Document
 
-filename = "filename"
+FORMAT = "{:<6}{:<24}"
+FORMAT_LENGTH = 30
+
+FILENAME = "filename"
 parser = argparse.ArgumentParser(
     prog='Word usage',
     description='The program prints the analysis of words used in assay',
@@ -16,6 +20,17 @@ parser.add_argument("-a", "--alphabet", action='store_true', help="Print words i
 parser.add_argument("filename", help="Full path to the essay text file")
 
 common_ignore = {'the', 'to', 'of', 'and', 'in', 'that', 'are', 'this', 'they'}
+
+
+def calculate_window_width():
+    try:
+        return os.get_terminal_size().columns
+    except IOError:
+        print("Unable to adjust word wrap for terminal simulators")
+        return FORMAT_LENGTH * 3
+
+
+WINDOW_WIDTH = calculate_window_width()
 
 
 def alphabet_comparator(x, y):
@@ -38,10 +53,32 @@ def len_comparator(x, y):
         return alphabet_comparator(wordX, wordY)
 
 
+def append_to_dict(i, dic, k, v):
+    if i in dic:
+        dic[i] += FORMAT.format(v, k)
+    else:
+        dic[i] = FORMAT.format(v, k)
+
+
 def printPretty(dictionary):
-    print("{:<8} {:<15}".format('Count', 'Word'))
+    header = FORMAT.format('Count', 'Word')
+    columns = WINDOW_WIDTH // FORMAT_LENGTH  # a single column width
+    rows = len(dictionary) // columns
+    wide_header = ''
+    for i in range(columns):
+        wide_header += header
+    print(wide_header)
+    total = len(dictionary)
+    i = 0
+    print_dic = {}
     for k, v in dictionary.items():
-        print("{:<8} {:<15}".format(v, k))
+        append_to_dict(i, print_dic, k, v)
+        if i < rows:
+            i += 1
+        else:
+            i = 0
+    for line in print_dic.values():
+        print(line)
 
 
 def is_meta_start(line):
@@ -71,8 +108,10 @@ class Essay:
         else:
             self.parseDocxFile()
 
-    def extractMeta(self):
-        pass
+    def is_meta(self, paragraph):
+        if paragraph.runs[0].italic:
+            return True
+        return False
 
     def parseTextFile(self):
         is_meta = False
@@ -95,17 +134,13 @@ class Essay:
                         self.dic[lc] = 1
 
     def parseDocxFile(self):
-        is_meta = False
+        is_meta_done = False
         doc = Document(self.filePath)
         for l in doc.paragraphs:
-            if is_meta_start(l.text):
-                is_meta = True
-                continue
-            if is_meta_end(l.text):
-                is_meta = False
-            if is_meta:
+            if self.is_meta(l):
                 self.meta += l.text
                 continue
+
             words = list(filter(None, re.split('\W', l.text)))
             for w in words:
                 lc = w.lower()
@@ -119,9 +154,11 @@ arguments = parser.parse_args()
 essayPath = pathlib.Path(arguments.filename)
 essayAnalysis = Essay(essayPath)
 essayAnalysis.parseFile()
-if (arguments.short_first):
+print(textwrap.fill(essayAnalysis.get_meta(), WINDOW_WIDTH))
+
+if arguments.short_first:
     printPretty(dict(sorted(essayAnalysis.get_dic().items(), key=cmp_to_key(len_comparator))))
-if (arguments.most_used_first):
+if arguments.most_used_first:
     printPretty(dict(sorted(essayAnalysis.get_dic().items(), key=lambda x: x[1], reverse=True)))
-if (arguments.alphabet):
+if arguments.alphabet:
     printPretty(dict(sorted(essayAnalysis.get_dic().items(), key=lambda x: x[0])))
