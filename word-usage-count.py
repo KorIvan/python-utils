@@ -155,7 +155,7 @@ essayPath = pathlib.Path(arguments.filename)
 essayAnalysis = Essay(essayPath)
 essayAnalysis.parseFile()
 print(textwrap.fill(essayAnalysis.get_meta(), WINDOW_WIDTH))
-
+print("Total word count:", sum(essayAnalysis.get_dic().values()))
 if arguments.short_first:
     printPretty(dict(sorted(essayAnalysis.get_dic().items(), key=cmp_to_key(len_comparator))))
 if arguments.most_used_first:
